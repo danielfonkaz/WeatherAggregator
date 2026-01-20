@@ -124,6 +124,7 @@ def handle_service_unavailable_error(context, last_access_timestamp_message: str
     }
 
 def lambda_handler(event, context):
+    # update for yml deploy test
     city = get_request_city_param(event)
 
     if not city:
