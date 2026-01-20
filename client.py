@@ -11,6 +11,7 @@ API_ENDPOINT = "https://vt7rupl6qklrnz4z6w2acoo22u0mzgdi.lambda-url.eu-north-1.o
 
 
 def fetch_data_from_api():
+    # update for yml deploy test
     try:
         # Send a GET request to the API
         response = requests.get(API_ENDPOINT)
