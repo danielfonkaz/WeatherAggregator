@@ -90,7 +90,7 @@ def handle_city_not_found(context, city: str, last_access_timestamp_message: str
             "message": "No data available for the specified city.",
             "details": f"No matching city was found with the name '{city}'.",
             "last_access": last_access_timestamp_message,
-            "recent_cities": recent_cities[:-1],
+            "recent_cities": recent_cities[1:],
             "request_id": context.aws_request_id
         })
     }
@@ -107,7 +107,7 @@ def handle_internal_server_error(context, recent_cities: List[str]):
             "error": "Internal Server Error",
             "message": "An unexpected error occurred.",
             "details": "Please try again later.",
-            "recent_cities": recent_cities[:-1],
+            "recent_cities": recent_cities[1:],
             "request_id": context.aws_request_id
         })
     }
@@ -174,7 +174,7 @@ def lambda_handler(event, context):
                 "city": city,
                 "weather": weather_data.to_json(),
                 "last_access": prev_last_access_timestamp_message,
-                "recent_cities": recent_cities[:-1],
+                "recent_cities": recent_cities[1:],
                 "request_id": context.aws_request_id
             })
         }

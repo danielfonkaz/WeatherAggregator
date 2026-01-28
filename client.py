@@ -7,7 +7,7 @@ import json
 
 # Replace this with the actual Invoke URL from your AWS API Gateway
 #API_ENDPOINT = "https://st0v5awjwg.execute-api.eu-north-1.amazonaws.com/default/sampleRestFunction?city=Jerusalem"
-API_ENDPOINT = "https://vt7rupl6qklrnz4z6w2acoo22u0mzgdi.lambda-url.eu-north-1.on.aws?city=Jerusalem"
+API_ENDPOINT = "https://vt7rupl6qklrnz4z6w2acoo22u0mzgdi.lambda-url.eu-north-1.on.aws?city=Tel_Aviv"
 
 
 def fetch_data_from_api():
