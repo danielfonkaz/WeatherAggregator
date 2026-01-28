@@ -1,7 +1,7 @@
 import json
 import boto3
 import time
-from typing import Optional
+from typing import Optional, List
 from typing import Tuple
 from botocore.exceptions import ClientError
 
@@ -37,27 +37,30 @@ def get_ip_last_accessed_timestamp_from_db(ip) -> Tuple[Optional[int], bool]:
         return None, False
 
 
-def update_ip_last_accessed_timestamp_in_db(ip) -> Tuple[Optional[int], bool]:
-    timestamp_seconds = int(time.time())
-
+def update_ip_fields_in_db(ip, last_access_timestamp: int, new_city: str) \
+        -> Tuple[Optional[int], Optional[List[str]], bool]:
     try:
         # 4. Perform the Update
         response = ip_table.update_item(
             Key={
                 'ip': ip
             },
-            UpdateExpression="SET LastAccessTimestamp = :t",
+            UpdateExpression="SET LastAccessTimestamp = :t,"
+                             " recent_cities = list_append(:c, if_not_exists(recent_cities, :empty))",
             ExpressionAttributeValues={
-                ':t': timestamp_seconds
+                ':t': last_access_timestamp,
+                ':c': [new_city],
+                ':empty': []
             },
             ReturnValues="UPDATED_NEW"
         )
-        print(f"LastAccessTimestamp Update successful: {response['Attributes']}")
-        return int(response['Attributes']['LastAccessTimestamp']), True
+        response_attributes = response['Attributes']
+        print(f"IP fields Update successful: {response_attributes}")
+        return int(response_attributes['LastAccessTimestamp']), response_attributes['recent_cities'] , True
 
     except ClientError as e:
         print(f"LastAccessTimestamp Update failed: {str(e)}")
-        return None, False
+        return None, None, False
 
 
 def handle_missing_parameter_city(context):
@@ -75,7 +78,7 @@ def handle_missing_parameter_city(context):
         })
     }
 
-def handle_city_not_found(context, city: str, last_access_timestamp_message: str):
+def handle_city_not_found(context, city: str, last_access_timestamp_message: str, recent_cities: List[str]):
     return {
         'statusCode': 404,
         'headers': {
@@ -87,12 +90,13 @@ def handle_city_not_found(context, city: str, last_access_timestamp_message: str
             "message": "No data available for the specified city.",
             "details": f"No matching city was found with the name '{city}'.",
             "last_access": last_access_timestamp_message,
+            "recent_cities": recent_cities[:-1],
             "request_id": context.aws_request_id
         })
     }
 
 
-def handle_internal_server_error(context):
+def handle_internal_server_error(context, recent_cities: List[str]):
     return {
         'statusCode': 500,
         'headers': {
@@ -103,6 +107,7 @@ def handle_internal_server_error(context):
             "error": "Internal Server Error",
             "message": "An unexpected error occurred.",
             "details": "Please try again later.",
+            "recent_cities": recent_cities[:-1],
             "request_id": context.aws_request_id
         })
     }
@@ -143,7 +148,9 @@ def lambda_handler(event, context):
     if not success:
         return handle_internal_server_error(context)
 
-    cur_last_access_timestamp, success = update_ip_last_accessed_timestamp_in_db(request_ip)
+    timestamp_seconds = int(time.time())
+
+    cur_last_access_timestamp, recent_cities, success = update_ip_fields_in_db(request_ip, timestamp_seconds, city)
 
     if not success:
         return handle_internal_server_error(context)
@@ -152,6 +159,7 @@ def lambda_handler(event, context):
         if prev_last_access_timestamp else "N / A"
 
     print(f"Previous last access: {prev_last_access_timestamp_message}")
+    print(f"Recent cities: {recent_cities}")
 
     try:
         weather_data = city_weather_data.fetch_city_weather_data(city)
@@ -166,16 +174,17 @@ def lambda_handler(event, context):
                 "city": city,
                 "weather": weather_data.to_json(),
                 "last_access": prev_last_access_timestamp_message,
+                "recent_cities": recent_cities[:-1],
                 "request_id": context.aws_request_id
             })
         }
 
     except CityWeatherDataCityNotFoundError as e:
         print(f'City Weather data fetching failed as city was not found: {e}')
-        return handle_city_not_found(context, city, prev_last_access_timestamp_message)
+        return handle_city_not_found(context, city, prev_last_access_timestamp_message, recent_cities)
     except CityWeatherDataRequestError as e:
         print(f'City Weather data fetching failed due to a request error: {e}')
-        return handle_service_unavailable_error(context, prev_last_access_timestamp_message)
+        return handle_service_unavailable_error(context, prev_last_access_timestamp_message, recent_cities)
 
 
 
