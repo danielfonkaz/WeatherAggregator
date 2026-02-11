@@ -7,7 +7,7 @@ import json
 
 # Replace this with the actual Invoke URL from your AWS API Gateway
 #API_ENDPOINT = "https://st0v5awjwg.execute-api.eu-north-1.amazonaws.com/default/sampleRestFunction?city=Jerusalem"
-API_ENDPOINT = "https://vt7rupl6qklrnz4z6w2acoo22u0mzgdi.lambda-url.eu-north-1.on.aws?city=Tel_Aviv"
+API_ENDPOINT = "https://vt7rupl6qklrnz4z6w2acoo22u0mzgdi.lambda-url.eu-north-1.on.aws?city=Haifa"
 
 
 def fetch_data_from_api():
@@ -35,8 +35,25 @@ def fetch_data_from_api():
         print(f"❌ An error occurred during the request: {err}")
 
 
+def demo_function(arg1, arg2, **kwargs):
+    print(arg1, arg2)
+    print("Keyword arguments (kwargs):", kwargs)
+
+demo_function("hel", 3, name="<NAME>", age=70)
+
 if __name__ == "__main__":
     fetch_data_from_api()
+
+
+# TODO
+# build get_response function
+# clear database in aws
+# on lambda end, return response with just the last unique 10 cities, keep the order
+# check implications of keeping large lists as fields in dynamo db
+# cash system for requests for same city - inmemory / in db
+# authentication system via an API key
+# rate limiting with an API key
+# continuous polling of api services so that lambda only retrieves available data - maybe poll only most popular cities - server architecture required
 
 
 

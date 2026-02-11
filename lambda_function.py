@@ -23,6 +23,17 @@ def get_request_ip(event):
 def get_request_city_param(event):
     return event.get('queryStringParameters', {}).get('city', None)
 
+def get_response(status_code: int, context, content_type: str = "application/json", **kwargs):
+    return {
+        'statusCode': status_code,
+        'headers': {
+            'Content-Type': content_type,
+            "X-Request-ID": context.aws_request_id
+        },
+        'body': json.dumps({
+            "requestId": context.aws_request_id,
+        } | kwargs)
+    }
 
 def get_ip_last_accessed_timestamp_from_db(ip) -> Tuple[Optional[int], bool]:
     try:
@@ -79,21 +90,10 @@ def handle_missing_parameter_city(context):
     }
 
 def handle_city_not_found(context, city: str, last_access_timestamp_message: str, recent_cities: List[str]):
-    return {
-        'statusCode': 404,
-        'headers': {
-            'Content-Type': 'application/json',
-            "X-Request-ID": context.aws_request_id
-        },
-        'body': json.dumps({
-            "error": "Not Found",
-            "message": "No data available for the specified city.",
-            "details": f"No matching city was found with the name '{city}'.",
-            "last_access": last_access_timestamp_message,
-            "recent_cities": recent_cities[1:],
-            "request_id": context.aws_request_id
-        })
-    }
+    return get_response(404, context, error="Not found", message="No data available for the specified city.",
+                        details=f"No matching city was found with the name '{city}'.",
+                        last_access=last_access_timestamp_message,
+                        recent_cities=recent_cities[1:])
 
 
 def handle_internal_server_error(context, recent_cities: List[str]):
