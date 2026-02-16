@@ -56,5 +56,3 @@ def fetch_data_open_meteo(latitude: float, longitude: float):
 
     except (requests.exceptions.HTTPError, requests.exceptions.RequestException) as err:
        raise OpenMeteoRequestError(err)
-
-# fetch_data_open_meteo(7.0, 15.5)

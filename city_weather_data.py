@@ -205,5 +205,3 @@ def fetch_city_weather_data(city_name: str) -> CityWeatherData:
         raise CityWeatherDataCityNotFoundError()
     except WeatherApiRequestError as e:
         raise CityWeatherDataRequestError(e)
-
-print(fetch_city_weather_data("Tel Aviv").to_json())
