@@ -96,7 +96,7 @@ def handle_city_not_found(context, city: str, last_access_timestamp_message: str
                         recent_cities=recent_cities[1:])
 
 
-def handle_internal_server_error(context, recent_cities: List[str]):
+def handle_internal_server_error(context):
     return {
         'statusCode': 500,
         'headers': {
@@ -107,7 +107,6 @@ def handle_internal_server_error(context, recent_cities: List[str]):
             "error": "Internal Server Error",
             "message": "An unexpected error occurred.",
             "details": "Please try again later.",
-            "recent_cities": recent_cities[1:],
             "request_id": context.aws_request_id
         })
     }
