@@ -78,6 +78,9 @@ class CityWeatherDataRequestError(CityWeatherDataFetchError):
         return f"{self.__class__.__name__}({repr(self.weather_service_error)})"
 
 
+STALE_CUTOFF_NUM_SECONDS = 6 * 60 * 60
+
+
 def convert_weather_condition_text_to_weather_condition(weather_condition_text: str) -> WeatherCondition:
     clear_weather_condition_text = (weather_condition_text.lower().replace("shower", "")
                               .replace("at times", "")
@@ -164,7 +167,6 @@ def convert_weather_service_response_to_weather_data(weather_service_response: A
 
 def average_city_weather_data(weather_data_list: List[CityWeatherData]) -> Optional[CityWeatherData]:
     def city_weather_data_filter(city_weather_data: CityWeatherData) -> bool:
-        STALE_CUTOFF_NUM_SECONDS = 6 * 60 * 60
         return (city_weather_data.latitude is not None and city_weather_data.longitude is not None
                 and city_weather_data.last_update_epoch is not None
                 and time.time() - city_weather_data.last_update_epoch <= STALE_CUTOFF_NUM_SECONDS)

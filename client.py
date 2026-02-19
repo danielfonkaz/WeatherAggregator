@@ -1,7 +1,7 @@
 import requests
 import json
 
-API_ENDPOINT = "https://vt7rupl6qklrnz4z6w2acoo22u0mzgdi.lambda-url.eu-north-1.on.aws?city=Tel Aviv"
+API_ENDPOINT = "https://vt7rupl6qklrnz4z6w2acoo22u0mzgdi.lambda-url.eu-north-1.on.aws?city=df fd"
 
 
 def fetch_data_from_api():

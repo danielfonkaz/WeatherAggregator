@@ -20,8 +20,13 @@ jobs:
           python -m py_compile *.py
           pip install flake8
           flake8 . --exclude=venv,.venv,env,bin,lib,deps --count --statistics  --ignore=E501,E127,E128,W503,E126
+      - name: Run Unit Tests
+        run: |
+          pip install pytest
+          pytest test_city_weather_data.py
 
       - name: Deploy to AWS
+        if: success() # only if tests passed
         uses: appleboy/lambda-action@master
         with:
           aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
