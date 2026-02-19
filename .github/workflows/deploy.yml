@@ -4,10 +4,23 @@ on:
     branches:
       - master
 jobs:
-  deploy:
+  test-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Lint and Syntax Check
+        run: |
+          python -m py_compile *.py
+          pip install flake8
+          flake8 . --exclude=venv,.venv,env,bin,lib,deps --count --statistics  --ignore=E501,E127,E128,W503,E126
+
       - name: Deploy to AWS
         uses: appleboy/lambda-action@master
         with:
