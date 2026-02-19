@@ -23,6 +23,7 @@ jobs:
       - name: Run Unit Tests
         run: |
           pip install pytest
+          pip install requests pytest
           pytest test_city_weather_data.py
 
       - name: Deploy to AWS
