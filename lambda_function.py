@@ -31,7 +31,7 @@ def get_response(status_code: int, context, content_type: str = "application/jso
         },
         'body': json.dumps({
             "requestId": context.aws_request_id,
-        } | kwargs) # add kwargs to body dict
+        } | kwargs)  # add kwargs to body dict
     }
 
 
