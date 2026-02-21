@@ -1,3 +1,16 @@
+"""City Weather Data Aggregation and Normalization Module.
+
+This module provides the core business logic for the Weather Aggregator. It
+is responsible for fetching data from multiple providers, normalizing disparate
+API responses into a unified format, and creating a standardized, averaged city weather data
+object while filtering out stale or invalid information.
+
+Main components:
+    - WeatherCondition: Unified enum for cross-provider weather states.
+    - CityWeatherData: The primary data model for aggregated results.
+    - Data Processing: Functions for text-to-enum mapping and multi-source averaging.
+"""
+
 import csv
 import json
 from datetime import datetime, timezone
@@ -13,6 +26,11 @@ from weather_service import WeatherServiceError
 
 
 class WeatherCondition(Enum):
+    """Enumeration of normalized weather condition states used across the application.
+
+        Each member contains a tuple of (id, display_name) to allow for
+        consistent UI rendering and internal logic.
+    """
     CLEAR = (0, "Clear")
     PARTIALLY_CLOUDY = (1, "Partially Cloudy")
     CLOUDY = (2, "Cloudy")
@@ -30,8 +48,26 @@ class WeatherCondition(Enum):
 
 
 class CityWeatherData:
+    """A unified data model representing aggregated weather data for a specific city.
+
+        Attributes:
+            latitude: City's geographic north-south coordinate.
+            longitude: City's geographic east-west coordinate.
+            last_update_epoch: The most recent valid data point's Unix timestamp.
+            temp_c: The calculated average temperature in Celsius.
+            weather_condition: A list of unique weather conditions reported by the service providers.
+    """
     def __init__(self, latitude: float, longitude: float, last_update_epoch: int, temp_c: float,
                  weather_condition: WeatherCondition | List[WeatherCondition]):
+        """Initializes CityWeatherData and normalizes weather_condition into a list.
+
+            Args:
+                latitude: City's geographic latitude.
+                longitude: City's geographic longitude.
+                last_update_epoch: Unix epoch timestamp.
+                temp_c: Temperature in Celsius.
+                weather_condition: A single WeatherCondition or a list of them.
+        """
         self.latitude = latitude
         self.longitude = longitude
         self.last_update_epoch = last_update_epoch
@@ -40,6 +76,7 @@ class CityWeatherData:
             if type(weather_condition) is list else [weather_condition]
 
     def __repr__(self):
+        """Returns a string representation of the CityWeatherData instance."""
         return (
             f"{self.__class__.__name__}("
             f"latitude={self.latitude!r}, "
@@ -50,6 +87,15 @@ class CityWeatherData:
         )
 
     def to_json(self):
+        """Serializes the object state into a JSON-formatted string.
+
+            Transforms internal attributes into a consumer-ready format, including
+            ISO 8601 timestamps, rounded temperatures, and human-readable
+            descriptions of weather conditions.
+
+            Returns:
+                str: A JSON string containing the processed weather data.
+        """
         return json.dumps({
             "latitude": self.latitude,
             "longitude": self.longitude,
@@ -62,18 +108,27 @@ class CityWeatherData:
 
 
 class CityWeatherDataFetchError(Exception):
+    """Base exception for errors occurring during the city data fetch process."""
     pass
 
 
 class CityWeatherDataCityNotFoundError(CityWeatherDataFetchError):
+    """Raised when the specified city cannot be resolved by the primary service provider."""
     def __repr__(self):
+        """Returns a string representation of the CityWeatherDataCityNotFoundError instance."""
         return f"{self.__class__.__name__}()"
 
 
 class CityWeatherDataRequestError(CityWeatherDataFetchError):
+    """Raised when a network or protocol-level error occurred during an API request of the primary service provider.
+
+        Attributes:
+            weather_service_error: The original WeatherServiceError instance.
+    """
     def __init__(self, weather_service_error: WeatherServiceError):
         self.weather_service_error = weather_service_error
 
+    """Returns a string representation of the CityWeatherDataRequestError instance."""
     def __repr__(self):
         return f"{self.__class__.__name__}({repr(self.weather_service_error)})"
 
@@ -82,6 +137,18 @@ STALE_CUTOFF_NUM_SECONDS = 6 * 60 * 60
 
 
 def convert_weather_condition_text_to_weather_condition(weather_condition_text: str) -> WeatherCondition:
+    """Normalizes raw weather description strings into a standard WeatherCondition enum.
+
+        This function performs 'fuzzy' text matching by stripping common API modifiers
+        (e.g., 'at times', 'slight', 'patchy') and mapping the core keywords to an
+        internal, provider-agnostic WeatherCondition representation.
+
+        Args:
+            weather_condition_text: The raw condition string from a weather service.
+
+        Returns:
+            A WeatherCondition enum member. Defaults to UNRECOGNIZED if no match is found.
+    """
     clear_weather_condition_text = (weather_condition_text.lower().replace("shower", "")
                               .replace("at times", "")
                               .replace("slight", "light")
@@ -129,6 +196,21 @@ def convert_weather_condition_text_to_weather_condition(weather_condition_text: 
 
 
 def convert_weather_service_response_to_weather_data(weather_service_response: Any) -> CityWeatherData:
+    """Transforms provider-specific response object into a unified CityWeatherData format.
+
+        Supports WeatherApiResponse (WeatherAPI) and OpenMeteoResponse (OpenMeteo).
+        For OpenMeteo, it performs an additional lookup against a local CSV file
+        to map numeric WMO weather codes to human-readable text before normalization.
+
+        Args:
+            weather_service_response: An instance of WeatherApiResponse or OpenMeteoResponse.
+
+        Returns:
+            A normalized CityWeatherData object.
+
+        Raises:
+            ValueError: If the response type is not recognized.
+    """
     OPEN_METEO_WEATHER_CODES_FILENAME = "open_meteo_weather_codes.csv"
     weather_condition_text = None
 
@@ -166,6 +248,21 @@ def convert_weather_service_response_to_weather_data(weather_service_response: A
 
 
 def average_city_weather_data(weather_data_list: List[CityWeatherData]) -> Optional[CityWeatherData]:
+    """Aggregates multiple normalized weather data points into a single unified average report.
+
+        The function applies a filter based firstly on 'freshness' defined by STALE_CUTOFF_NUM_SECONDS
+        and secondly by the existence of location metadata and a timestamp.
+        Among data points for which the existence condition holds,
+        It calculates the mean temperature and identifies the set of unique weather
+        conditions across all non-stale data points.
+
+        Args:
+            weather_data_list: A list of normalized CityWeatherData objects.
+
+        Returns:
+            An aggregated CityWeatherData object, or None if no data point passes the
+            existence and freshness filters.
+    """
     def city_weather_data_filter(city_weather_data: CityWeatherData) -> bool:
         return (city_weather_data.latitude is not None and city_weather_data.longitude is not None
                 and city_weather_data.last_update_epoch is not None
@@ -189,6 +286,25 @@ def average_city_weather_data(weather_data_list: List[CityWeatherData]) -> Optio
 
 
 def fetch_city_weather_data(city_name: str) -> CityWeatherData:
+    """Orchestrates multi-source weather data retrieval and aggregation for a city.
+
+        Flow:
+            1. Query WeatherAPI by city name (Primary).
+            2. Use coordinates from the primary result to query OpenMeteo (Backup).
+            3. Normalize both responses into CityWeatherData objects.
+            4. Average the data and apply data integrity and stale-data filtering.
+
+        Args:
+            city_name: The name of the city to query.
+
+        Returns:
+            A final, aggregated CityWeatherData object.
+
+        Raises:
+            CityWeatherDataCityNotFoundError: If the city cannot be found.
+            CityWeatherDataRequestError: If the primary service request fails.
+            CityWeatherDataFetchError: If all retrieved data is considered stale.
+    """
     try:
         weather_service_responses = [weather_api.fetch_data_weather_api(city_name)]
 
