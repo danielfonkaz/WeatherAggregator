@@ -12,6 +12,8 @@ The module follows a clean separation of concerns:
 """
 
 import json
+import os
+
 import requests
 from weather_service import WeatherServiceError
 
@@ -139,7 +141,7 @@ def fetch_data_weather_api(city_name: str) -> WeatherApiResponse:
             WeatherApiRequestError: If a network error occurs or the API
                 returns a non-success status code.
     """
-    WEATHER_API_KEY = "dabfd11ef5ff4c8da5e215521253012"
+    WEATHER_API_KEY = os.getenv('WEATHER_API_KEY')
     WEATHER_API_ENDPOINT = f"https://api.weatherapi.com/v1/current.json?key={WEATHER_API_KEY}&q={city_name}"
     try:
         response = requests.get(WEATHER_API_ENDPOINT)
