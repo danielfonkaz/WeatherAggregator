@@ -36,3 +36,5 @@ jobs:
           aws_region: eu-north-1
           function_name: weatherAggregator
           source: .
+          envs:
+            WEATHER_API_KEY=${{ secrets.WEATHER_API_KEY }}
