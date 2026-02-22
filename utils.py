@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
-from typing import List, Any
+from itertools import groupby
+from typing import List, Any, Iterable
 
 
 def epoch_timestamp_to_iso_format(timestamp_epoch: int) -> str:
@@ -37,3 +38,26 @@ def remove_list_dups(lst: List[Any]) -> List[Any]:
             [1, 2, 3]
     """
     return list(dict.fromkeys(lst))
+
+
+def remove_adjacent_dups(seq: Iterable[Any]) -> List[Any]:
+    """
+        Removes consecutive duplicate elements from a sequence.
+
+        This function collapses adjacent identical items into a single instance,
+        similar to the 'uniq' command in Unix. Non-adjacent duplicates are
+        preserved.
+
+        Args:
+            seq (Iterable[Any]): An iterable sequence of items (list, string, etc.).
+
+        Returns:
+            List[Any]: A list where no two consecutive elements are the same.
+
+        Example:
+            >>> remove_adjacent_dups([1, 2, 2, 3, 3, 3, 2, 1, 1])
+            [1, 2, 3, 2, 1]
+            >>> remove_adjacent_dups("AAAABBBCCDAA")
+            ['A', 'B', 'C', 'D', 'A']
+    """
+    return [key for key, _ in groupby(seq)]

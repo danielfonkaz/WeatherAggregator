@@ -42,10 +42,10 @@ def get_request_city_param(event: dict) -> Optional[str]:
 
 def get_unique_recent_cities_list(recent_cities: List[str]) -> List[str]:
     """
-        Processes the raw city history to return a unique list of past searches.
+        Processes the raw city history to return a list of past searches with no identical adjacent entries.
 
         This function takes a list of city names, excludes the first element
-        (the current search), and removes any duplicate entries
+        (the current search), and removes any consecutive duplicate entries
         while maintaining the order of search history.
 
         Args:
@@ -53,10 +53,10 @@ def get_unique_recent_cities_list(recent_cities: List[str]) -> List[str]:
                 from the database or session history.
 
         Returns:
-            List[str]: A list of unique city names, excluding the most
+            List[str]: A list of past searches with no identical adjacent entries, excluding the most
                 recent entry.
     """
-    return utils.remove_list_dups(recent_cities[1:])
+    return utils.remove_adjacent_dups(recent_cities[1:])
 
 
 def get_response(status_code: int, context: Context, content_type: str = "application/json", **kwargs) -> dict:
