@@ -40,6 +40,25 @@ def get_request_city_param(event: dict) -> Optional[str]:
     return event.get('queryStringParameters', {}).get('city', None)
 
 
+def get_unique_recent_cities_list(recent_cities: List[str]) -> List[str]:
+    """
+        Processes the raw city history to return a unique list of past searches.
+
+        This function takes a list of city names, excludes the first element
+        (the current search), and removes any duplicate entries
+        while maintaining the order of search history.
+
+        Args:
+            recent_cities (List[str]): A list of city name strings retrieved
+                from the database or session history.
+
+        Returns:
+            List[str]: A list of unique city names, excluding the most
+                recent entry.
+    """
+    return utils.remove_list_dups(recent_cities[1:])
+
+
 def get_response(status_code: int, context: Context, content_type: str = "application/json", **kwargs) -> dict:
     """Constructs a standardized HTTP response for the Lambda Gateway.
 
@@ -134,7 +153,7 @@ def handle_city_not_found(context: Context, city: str, last_access_timestamp_mes
     return get_response(404, context, error="Not found", message="No data available for the specified city.",
                         details=f"No matching city was found with the name '{city}'.",
                         last_access=last_access_timestamp_message,
-                        recent_cities=recent_cities[1:])
+                        recent_cities=get_unique_recent_cities_list(recent_cities))
 
 
 def handle_internal_server_error(context: Context):
@@ -200,7 +219,7 @@ def lambda_handler(event, context: Context) -> dict:
 
         return get_response(200, context, city=city, weather=weather_data.to_json(),
                             last_access=prev_last_access_timestamp_message,
-                            recent_cities=recent_cities[1:])
+                            recent_cities=get_unique_recent_cities_list(recent_cities))
     except CityWeatherDataCityNotFoundError as e:
         print(f'City Weather data fetching failed as city was not found: {e}')
         return handle_city_not_found(context, city, prev_last_access_timestamp_message, recent_cities)
