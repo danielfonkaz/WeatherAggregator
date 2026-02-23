@@ -68,4 +68,4 @@ jobs:
         run: |
           aws lambda update-function-configuration \
           --function-name weatherAggregator \
-          --environment "Variables={WEATHER_API_KEY=${{ secrets.WEATHER_API_KEY }},AWS_REGION=eu-north-1}"
+          --environment "Variables={WEATHER_API_KEY=${{ secrets.WEATHER_API_KEY }}}"
