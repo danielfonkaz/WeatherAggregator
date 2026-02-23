@@ -59,6 +59,11 @@ jobs:
           --function-name weatherAggregator \
           --image-uri ${{ steps.login-ecr.outputs.registry }}/weather-aggregator:${{ github.sha }}
 
+      - name: Wait for Lambda update to complete
+        run: |
+          aws lambda wait function-updated \
+            --function-name weatherAggregator
+
       - name: Update Lambda Environment Variables
         run: |
           aws lambda update-function-configuration \
