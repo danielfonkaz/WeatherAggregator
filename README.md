@@ -19,7 +19,7 @@ This is the recommended way to interact with the service programmatically. It ha
 import requests
 import json
 
-API_ENDPOINT = "https://vt7rupl6qklrnz4z6w2acoo22u0mzgdi.lambda-url.eu-north-1.on.aws"
+API_ENDPOINT = "https://ehftqv7cnzsgir5o2w2aebp5ji0haqbr.lambda-url.eu-north-1.on.aws/"
 
 
 def fetch_data_from_api():
