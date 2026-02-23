@@ -11,6 +11,8 @@ Environment Requirements:
     - DynamoDB Table: 'RequestIPLogs' must exist with 'ip' as the Partition Key.
 """
 import json
+import os
+
 import boto3
 import time
 from typing import Optional, List, Tuple, TYPE_CHECKING
@@ -26,7 +28,8 @@ import utils
 from city_weather_data import CityWeatherDataCityNotFoundError
 from city_weather_data import CityWeatherDataRequestError
 
-dynamodb = boto3.resource('dynamodb')
+aws_region = os.environ.get('AWS_REGION', 'eu-north-1')
+dynamodb = boto3.resource('dynamodb', region_name=aws_region)
 ip_table = dynamodb.Table("RequestIPLogs")
 
 
@@ -59,7 +62,7 @@ def get_unique_recent_cities_list(recent_cities: List[str]) -> List[str]:
     return utils.remove_adjacent_dups(recent_cities[1:])
 
 
-def get_response(status_code: int, context: Context, content_type: str = "application/json", **kwargs) -> dict:
+def get_response(status_code: int, context: "Context", content_type: str = "application/json", **kwargs) -> dict:
     """Constructs a standardized HTTP response for the Lambda Gateway.
 
         Args:
@@ -138,14 +141,14 @@ def update_ip_fields_in_db(ip, last_access_timestamp: int, new_city: str) \
         return None, None, False
 
 
-def handle_missing_parameter_city(context: Context) -> dict:
+def handle_missing_parameter_city(context: "Context") -> dict:
     """Returns a formatted HTTP 400 Bad Request response for missing query parameters."""
     return get_response(400, context, error="Bad Request",
                         message="The required query parameter 'city' is missing.",
                         details="Please include ?city=CityName in the request URL.")
 
 
-def handle_city_not_found(context: Context, city: str, last_access_timestamp_message: str, recent_cities: List[str]) \
+def handle_city_not_found(context: "Context", city: str, last_access_timestamp_message: str, recent_cities: List[str]) \
         -> dict:
     """Returns a formatted HTTP 404 Not Found response when a city name cannot be resolved
         by the primary service provider.
@@ -156,14 +159,14 @@ def handle_city_not_found(context: Context, city: str, last_access_timestamp_mes
                         recent_cities=get_unique_recent_cities_list(recent_cities))
 
 
-def handle_internal_server_error(context: Context):
+def handle_internal_server_error(context: "Context"):
     """Returns a formatted HTTP 500 Internal Server Error response for DB access failures."""
     return get_response(500, context, error="Internal Server Error",
                         message="An unexpected error occurred.",
                         details="Please try again later.")
 
 
-def handle_service_unavailable_error(context: Context, last_access_timestamp_message: str) -> dict:
+def handle_service_unavailable_error(context: "Context", last_access_timestamp_message: str) -> dict:
     """Returns a formatted HTTP 503 Service Unavailable response for service provider timeouts/failures."""
     return get_response(503, context, error="Service Unavailable",
                         message="Service is currently unavailable.",
@@ -171,7 +174,7 @@ def handle_service_unavailable_error(context: Context, last_access_timestamp_mes
                         last_access=last_access_timestamp_message)
 
 
-def lambda_handler(event, context: Context) -> dict:
+def lambda_handler(event, context: "Context") -> dict:
     """The primary execution entry point for the AWS Lambda function.
 
         Execution Flow:
@@ -192,6 +195,7 @@ def lambda_handler(event, context: Context) -> dict:
     request_ip = get_request_ip(event)
 
     if not request_ip:
+        print("Request missing ip")
         return handle_internal_server_error(context)
 
     print(f"Received request from IP: {request_ip}")
