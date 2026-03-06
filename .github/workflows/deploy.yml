@@ -87,8 +87,8 @@ jobs:
       - name: Update Lambda Environment Variables
         run: |
           aws lambda update-function-configuration \
-          --function-name ${{ env.LAMBDA_NAME }} \
-          --environment "Variables={WEATHER_API_KEY=${{ secrets.WEATHER_API_KEY }}}"
+            --function-name ${{ env.LAMBDA_NAME }} \
+            --environment "Variables={WEATHER_API_KEY=${{ secrets.WEATHER_API_KEY }}}"
 
       - name: Create or Update Lambda Function URL
         id: lambda-url
@@ -97,18 +97,27 @@ jobs:
           aws lambda create-function-url-config \
             --function-name ${{ env.LAMBDA_NAME }} \
             --auth-type NONE || \
+        
           aws lambda update-function-url-config \
             --function-name ${{ env.LAMBDA_NAME }} \
             --auth-type NONE
-          
-          # Add permission so anyone (or your team) can invoke the URL
-          aws lambda add-permission \
-            --function-name ${{ env.LAMBDA_NAME }} \
-            --statement-id FunctionURLAllowPublicAccess \
+
+          # Add permissions so anyone can invoke the URL
+          aws lambda add-permission \   
+            --function-name ${{ env.LAMBDA_NAME }} \ 
+            --statement-id FunctionURLAllowPublicAccess \ 
             --action lambda:InvokeFunctionUrl \
             --principal "*" \
-            --function-url-auth-type NONE || echo "Permission already exists"
-          
+            --function-url-auth-type NONE || echo "InvokeFunctionUrl permission already exists"
+        
+        
+          aws lambda add-permission \
+            --function-name ${{ env.LAMBDA_NAME }} \
+            --statement-id AllowPublicInvokeBypass \
+            --action lambda:InvokeFunction \
+            --principal "*"  
+            --function-url-auth-type NONE || echo "InvokeFunction permission already exists"
+
           # Get the URL to display in the logs
           URL=$(aws lambda get-function-url-config --function-name ${{ env.LAMBDA_NAME }} --query 'FunctionUrl' --output text)
           echo "LAMBDA_URL=$URL" >> $GITHUB_ENV
