@@ -43,13 +43,13 @@ jobs:
       - name: Set Environment Variables
           # Sanitize the branch name for AWS (removes slashes/dots)
         run: |
-            CLEAN_NAME=$(echo ${GITHUB_REF_NAME} | sed 's/[^a-zA-Z0-9-]/-/g')
-            echo "ENV_NAME=$CLEAN_NAME" >> $GITHUB_ENV
-            if [ "${{ github.ref_name }}" == "master" ]; then
-              echo "LAMBDA_NAME=weatherAggregator" >> $GITHUB_ENV
-            else
-              echo "LAMBDA_NAME=weatherAggregator-$CLEAN_NAME" >> $GITHUB_ENV
-            fi
+          CLEAN_NAME=$(echo ${GITHUB_REF_NAME} | sed 's/[^a-zA-Z0-9-]/-/g')
+          echo "ENV_NAME=$CLEAN_NAME" >> $GITHUB_ENV
+          if [ "${{ github.ref_name }}" == "master" ]; then
+            echo "LAMBDA_NAME=weatherAggregator" >> $GITHUB_ENV
+          else
+            echo "LAMBDA_NAME=weatherAggregator-$CLEAN_NAME" >> $GITHUB_ENV
+          fi
 
       - name: Build, Tag, and Push Image to ECR
         env:
@@ -110,7 +110,6 @@ jobs:
             --principal "*" \
             --function-url-auth-type NONE || echo "InvokeFunctionUrl permission already exists"
         
-        
           aws lambda add-permission \
             --function-name ${{ env.LAMBDA_NAME }} \
             --statement-id AllowPublicInvokeBypass \
@@ -133,7 +132,7 @@ jobs:
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| **Branch** | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Lambda Name** | \`${{ env.LAMBDA_NAME }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Function URL** | (${{ env.LAMBDA_URL }}) |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Function URL** | [Click here to open](${{ env.LAMBDA_URL }}) |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "> [!TIP]" >> $GITHUB_STEP_SUMMARY
           echo "> This Lambda will stay active until the branch is deleted." >> $GITHUB_STEP_SUMMARY
