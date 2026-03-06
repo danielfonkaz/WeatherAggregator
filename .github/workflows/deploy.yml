@@ -115,7 +115,7 @@ jobs:
             --function-name ${{ env.LAMBDA_NAME }} \
             --statement-id AllowPublicInvokeBypass \
             --action lambda:InvokeFunction \
-            --principal "*"  
+            --principal "*" \
             --function-url-auth-type NONE || echo "InvokeFunction permission already exists"
 
           # Get the URL to display in the logs
