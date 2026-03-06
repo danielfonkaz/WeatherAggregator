@@ -96,16 +96,14 @@ jobs:
           # Create the Function URL if it doesn't exist
           aws lambda create-function-url-config \
             --function-name ${{ env.LAMBDA_NAME }} \
-            --auth-type NONE || \
-        
-          aws lambda update-function-url-config \
+            --auth-type NONE || aws lambda update-function-url-config \
             --function-name ${{ env.LAMBDA_NAME }} \
             --auth-type NONE
 
           # Add permissions so anyone can invoke the URL
-          aws lambda add-permission \   
-            --function-name ${{ env.LAMBDA_NAME }} \ 
-            --statement-id FunctionURLAllowPublicAccess \ 
+          aws lambda add-permission \
+            --function-name ${{ env.LAMBDA_NAME }} \
+            --statement-id FunctionURLAllowPublicAccess \
             --action lambda:InvokeFunctionUrl \
             --principal "*" \
             --function-url-auth-type NONE || echo "InvokeFunctionUrl permission already exists"
