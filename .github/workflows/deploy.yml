@@ -89,3 +89,42 @@ jobs:
           aws lambda update-function-configuration \
           --function-name ${{ env.LAMBDA_NAME }} \
           --environment "Variables={WEATHER_API_KEY=${{ secrets.WEATHER_API_KEY }}}"
+
+      - name: Create or Update Lambda Function URL
+        id: lambda-url
+        run: |
+          # Create the Function URL if it doesn't exist
+          aws lambda create-function-url-config \
+            --function-name ${{ env.LAMBDA_NAME }} \
+            --auth-type NONE || \
+          aws lambda update-function-url-config \
+            --function-name ${{ env.LAMBDA_NAME }} \
+            --auth-type NONE
+          
+          # Add permission so anyone (or your team) can invoke the URL
+          aws lambda add-permission \
+            --function-name ${{ env.LAMBDA_NAME }} \
+            --statement-id FunctionURLAllowPublicAccess \
+            --action lambda:InvokeFunctionUrl \
+            --principal "*" \
+            --function-url-auth-type NONE || echo "Permission already exists"
+          
+          # Get the URL to display in the logs
+          URL=$(aws lambda get-function-url-config --function-name ${{ env.LAMBDA_NAME }} --query 'FunctionUrl' --output text)
+          echo "LAMBDA_URL=$URL" >> $GITHUB_ENV
+          echo "The Function URL is: $URL"
+
+      - name: Generate Deployment Summary
+        run: |
+          echo "## Feature Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Your branch-specific environment is live and ready for testing." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Branch** | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Lambda Name** | \`${{ env.LAMBDA_NAME }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Function URL** | (${{ env.LAMBDA_URL }}) |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> [!TIP]" >> $GITHUB_STEP_SUMMARY
+          echo "> This Lambda will stay active until the branch is deleted." >> $GITHUB_STEP_SUMMARY
