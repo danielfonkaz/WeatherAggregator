@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - master
+      - 'feature/*'
 jobs:
   test-and-deploy:
     runs-on: ubuntu-latest
@@ -39,33 +40,52 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Set Environment Variables
+          # Sanitize the branch name for AWS (removes slashes/dots)
+        run: |
+            CLEAN_NAME=$(echo ${GITHUB_REF_NAME} | sed 's/[^a-zA-Z0-9-]/-/g')
+            echo "ENV_NAME=$CLEAN_NAME" >> $GITHUB_ENV
+            if [ "${{ github.ref_name }}" == "master" ]; then
+              echo "LAMBDA_NAME=weatherAggregator" >> $GITHUB_ENV
+            else
+              echo "LAMBDA_NAME=weatherAggregator-$CLEAN_NAME" >> $GITHUB_ENV
+            fi
+
       - name: Build, Tag, and Push Image to ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: weather-aggregator
-          IMAGE_TAG: ${{ github.sha }}
         run: |
-          # Build the image using the GitHub commit SHA as a unique tag
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          
-          # Optional: Also tag and push as 'latest' for easier reference
-          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          # Tag with branch name for isolation, and SHA for uniqueness
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:${{ env.ENV_NAME }} .
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }} .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:${{ env.ENV_NAME }}
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}
 
-      - name: Update Lambda Function with New Image
+      - name: Ensure Lambda Exists or Update Code
         run: |
-          aws lambda update-function-code \
-          --function-name weatherAggregator \
-          --image-uri ${{ steps.login-ecr.outputs.registry }}/weather-aggregator:${{ github.sha }}
+          # Check if the branch-specific Lambda exists
+          if ! aws lambda get-function --function-name ${{ env.LAMBDA_NAME }} > /dev/null 2>&1; then
+            echo "Creating new Lambda for branch: ${{ env.LAMBDA_NAME }}"
+            aws lambda create-function \
+              --function-name ${{ env.LAMBDA_NAME }} \
+              --package-type Image \
+              --code ImageUri=${{ steps.login-ecr.outputs.registry }}/weather-aggregator:${{ github.sha }} \
+              --role arn:aws:iam::179776888271:role/service-role/sampleRestFunction-role-irjw02b8
+          else
+            echo "Updating existing Lambda: ${{ env.LAMBDA_NAME }}"
+            aws lambda update-function-code \
+              --function-name ${{ env.LAMBDA_NAME }} \
+              --image-uri ${{ steps.login-ecr.outputs.registry }}/weather-aggregator:${{ github.sha }}
+          fi
 
       - name: Wait for Lambda update to complete
         run: |
           aws lambda wait function-updated \
-            --function-name weatherAggregator
+            --function-name ${{ env.LAMBDA_NAME }}
 
       - name: Update Lambda Environment Variables
         run: |
           aws lambda update-function-configuration \
-          --function-name weatherAggregator \
+          --function-name ${{ env.LAMBDA_NAME }} \
           --environment "Variables={WEATHER_API_KEY=${{ secrets.WEATHER_API_KEY }}}"
