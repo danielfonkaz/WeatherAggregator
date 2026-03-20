@@ -1,0 +1,36 @@
+name: Cleanup AWS Resources
+on:
+  delete:
+    branches-ignore:
+      - master
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    # Only run if a branch was deleted (ignores tag deletions)
+    if: github.event.ref_type == 'branch'
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-north-1
+
+      - name: Set Environment Variables
+        run: |
+          CLEAN_NAME=$(echo ${GITHUB_EVENT_REF} | sed 's/[^a-zA-Z0-9-]/-/g')
+          echo "LAMBDA_NAME=weatherAggregator-$CLEAN_NAME" >> $GITHUB_ENV
+          echo "IMAGE_TAG=$CLEAN_NAME" >> $GITHUB_ENV
+
+      - name: Delete Lambda Function
+        run: |
+          echo "Deleting Lambda: ${{ env.LAMBDA_NAME }}"
+          aws lambda delete-function --function-name ${{ env.LAMBDA_NAME }} || echo "Lambda already deleted."
+
+      - name: Delete ECR Image
+        run: |
+          echo "Deleting ECR image tag: ${{ env.IMAGE_TAG }}"
+          aws ecr batch-delete-image \
+            --repository-name weather-aggregator \
+            --image-ids imageTag=${{ env.IMAGE_TAG }} || echo "Image tag not found."
