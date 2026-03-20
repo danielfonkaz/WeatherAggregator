@@ -1,14 +1,12 @@
-name: Cleanup AWS Resources
+name: Cleanup Branch Resources
 on:
   delete:
-    branches-ignore:
-      - master
+    branches:
+      - 'feature/*'
 
 jobs:
   cleanup:
     runs-on: ubuntu-latest
-    # Only run if a branch was deleted (ignores tag deletions)
-    if: github.event.ref_type == 'branch'
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -17,20 +15,69 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: eu-north-1
 
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
       - name: Set Environment Variables
+          # Mirror the same sanitization logic used in deploy.yml
         run: |
-          CLEAN_NAME=$(echo ${GITHUB_EVENT_REF} | sed 's/[^a-zA-Z0-9-]/-/g')
+          CLEAN_NAME=$(echo ${{ github.event.ref }} | sed 's/[^a-zA-Z0-9-]/-/g')
+          echo "ENV_NAME=$CLEAN_NAME" >> $GITHUB_ENV
           echo "LAMBDA_NAME=weatherAggregator-$CLEAN_NAME" >> $GITHUB_ENV
-          echo "IMAGE_TAG=$CLEAN_NAME" >> $GITHUB_ENV
+          echo "ECR_REGISTRY=${{ steps.login-ecr.outputs.registry }}" >> $GITHUB_ENV
 
       - name: Delete Lambda Function
         run: |
-          echo "Deleting Lambda: ${{ env.LAMBDA_NAME }}"
-          aws lambda delete-function --function-name ${{ env.LAMBDA_NAME }} || echo "Lambda already deleted."
+          if aws lambda get-function --function-name ${{ env.LAMBDA_NAME }} > /dev/null 2>&1; then
+            echo "Deleting Lambda: ${{ env.LAMBDA_NAME }}"
+            aws lambda delete-function --function-name ${{ env.LAMBDA_NAME }}
+            echo "Lambda deleted."
+          else
+            echo "Lambda ${{ env.LAMBDA_NAME }} not found — nothing to delete."
+          fi
 
-      - name: Delete ECR Image
+      - name: Delete ECR Images for Branch
+        env:
+          ECR_REPOSITORY: weather-aggregator
         run: |
-          echo "Deleting ECR image tag: ${{ env.IMAGE_TAG }}"
-          aws ecr batch-delete-image \
-            --repository-name weather-aggregator \
-            --image-ids imageTag=${{ env.IMAGE_TAG }} || echo "Image tag not found."
+          # Delete the branch-tag image
+          if aws ecr describe-images \
+            --repository-name $ECR_REPOSITORY \
+            --image-ids imageTag=${{ env.ENV_NAME }} > /dev/null 2>&1; then
+            echo "Deleting ECR image with tag: ${{ env.ENV_NAME }}"
+            aws ecr batch-delete-image \
+              --repository-name $ECR_REPOSITORY \
+              --image-ids imageTag=${{ env.ENV_NAME }}
+          else
+            echo "No ECR image found with tag: ${{ env.ENV_NAME }}"
+          fi
+
+          # After removing the branch tag, any SHA-tagged images that were
+          # only referenced by this branch tag become untagged. Clean those up.
+          UNTAGGED=$(aws ecr list-images \
+            --repository-name $ECR_REPOSITORY \
+            --filter tagStatus=UNTAGGED \
+            --query 'imageIds[*]' \
+            --output json)
+
+          if [ "$UNTAGGED" != "[]" ] && [ -n "$UNTAGGED" ]; then
+            echo "Deleting untagged images: $UNTAGGED"
+            aws ecr batch-delete-image \
+              --repository-name $ECR_REPOSITORY \
+              --image-ids "$UNTAGGED"
+          else
+            echo "No untagged images to clean up."
+          fi
+
+      - name: Generate Cleanup Summary
+        run: |
+          echo "## Branch Cleanup Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Resources for the deleted branch have been removed." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Branch** | \`${{ github.event.ref }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Lambda deleted** | \`${{ env.LAMBDA_NAME }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **ECR tag deleted** | \`${{ env.ENV_NAME }}\` |" >> $GITHUB_STEP_SUMMARY
