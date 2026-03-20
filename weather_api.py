@@ -126,7 +126,7 @@ def fetch_data_weather_api(city_name: str) -> WeatherApiResponse:
     """Fetches real-time weather data from the WeatherAPI service.
 
         Connects to the WeatherAPI external endpoint to retrieve city location
-        metadata (i.e. latitude, longitude) and current weather conditions
+        metadata (i.e., latitude, longitude) and current weather conditions
         (such as temperature in Celsius and a weather description) for a specific city.
 
         Args:
