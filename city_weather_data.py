@@ -235,8 +235,8 @@ def convert_weather_service_response_to_weather_data(weather_service_response: A
             print(f"Could not read open meteo weather codes file: {e}")
 
     else:
-        raise ValueError(f"weather_service_response must be an instance of {WeatherApiResponse.__class__.__name__}"
-                         f" or {OpenMeteoResponse.__class__.__name__}")
+        raise ValueError(f"weather_service_response must be an instance of {WeatherApiResponse.__name__}"
+                         f" or {OpenMeteoResponse.__name__}")
 
     latitude = weather_service_response.latitude
     longitude = weather_service_response.longitude
