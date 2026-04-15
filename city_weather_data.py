@@ -214,10 +214,10 @@ def convert_weather_service_response_to_weather_data(weather_service_response: A
     OPEN_METEO_WEATHER_CODES_FILENAME = "open_meteo_weather_codes.csv"
     weather_condition_text = None
 
-    if type(weather_service_response) is WeatherApiResponse:
+    if isinstance(weather_service_response, WeatherApiResponse):
         last_update_epoch = weather_service_response.last_update_epoch
         weather_condition_text = weather_service_response.condition_text
-    elif type(weather_service_response) is OpenMeteoResponse:
+    elif isinstance(weather_service_response, OpenMeteoResponse):
         last_update_epoch = int(datetime.strptime(weather_service_response.time, "%Y-%m-%dT%H:%M")
                                 .replace(tzinfo=timezone.utc).timestamp()) \
                             if weather_service_response.time \
