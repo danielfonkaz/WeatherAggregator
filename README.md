@@ -9,7 +9,7 @@ The service is deployed as an AWS Lambda Function URL. You can consume the API u
 ### 1. Simple cURL Request
 
 ```bash
-curl "https://vt7rupl6qklrnz4z6w2acoo22u0mzgdi.lambda-url.eu-north-1.on.aws?city=New York"
+curl "https://ehftqv7cnzsgir5o2w2aebp5ji0haqbr.lambda-url.eu-north-1.on.aws?city=New York"
 ```
 
 ### 2. Python Client
