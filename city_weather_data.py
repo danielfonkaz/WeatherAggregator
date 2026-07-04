@@ -21,7 +21,8 @@ from typing import Any, List, Optional
 import open_meteo
 import utils
 from open_meteo import OpenMeteoRequestError, OpenMeteoResponse
-from upstash_redis import Redis
+if os.getenv("TESTING") is None:
+    from upstash_redis import Redis
 import weather_api
 from weather_api import WeatherApiRequestError, WeatherApiCityNotFoundError, WeatherApiResponse
 from weather_service import WeatherServiceError
@@ -30,11 +31,12 @@ CACHE_TTL = int(os.environ.get("CACHE_TTL_SECONDS", 1800))
 
 # Initialize Redis client outside the handler for connection reuse
 # This looks for UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN in env
-try:
-    redis = Redis.from_env()
-except Exception as e:
-    print(f"Failed to initialize Redis: {e}")
-    redis = None
+if os.getenv("TESTING") is None:
+    try:
+        redis = Redis.from_env()
+    except Exception as e:
+        print(f"Failed to initialize Redis: {e}")
+        redis = None
 
 
 class WeatherCondition(Enum):
