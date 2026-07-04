@@ -341,7 +341,7 @@ def fetch_city_weather_data(city_name: str) -> CityWeatherData:
                 print(f"Redis cache miss for {normalized_city_name}. Fetching fresh data.")
         except Exception as e:
             print(f"Redis GET error for {normalized_city_name}: {e}. Fetching fresh data.")
-            #raise CityWeatherDataRequestError(WeatherServiceError(e))
+            # raise CityWeatherDataRequestError(WeatherServiceError(e))
 
     try:
         weather_service_responses = [weather_api.fetch_data_weather_api(city_name)]
