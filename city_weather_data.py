@@ -13,6 +13,7 @@ Main components:
 
 import csv
 import json
+import os
 from datetime import datetime, timezone
 import time
 from enum import Enum
@@ -20,9 +21,20 @@ from typing import Any, List, Optional
 import open_meteo
 import utils
 from open_meteo import OpenMeteoRequestError, OpenMeteoResponse
+from upstash_redis import Redis
 import weather_api
 from weather_api import WeatherApiRequestError, WeatherApiCityNotFoundError, WeatherApiResponse
 from weather_service import WeatherServiceError
+
+CACHE_TTL = int(os.environ.get("CACHE_TTL_SECONDS", 1800))
+
+# Initialize Redis client outside the handler for connection reuse
+# This looks for UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN in env
+try:
+    redis = Redis.from_env()
+except Exception as e:
+    print(f"Failed to initialize Redis: {e}")
+    redis = None
 
 
 class WeatherCondition(Enum):
@@ -286,25 +298,51 @@ def average_city_weather_data(weather_data_list: List[CityWeatherData]) -> Optio
 
 
 def fetch_city_weather_data(city_name: str) -> CityWeatherData:
-    """Orchestrates multi-source weather data retrieval and aggregation for a city.
+    """Orchestrates cached, multi-source weather data retrieval and aggregation.
 
-        Flow:
-            1. Query WeatherAPI by city name (Primary).
-            2. Use coordinates from the primary result to query OpenMeteo (Backup).
-            3. Normalize both responses into CityWeatherData objects.
-            4. Average the data and apply data integrity and stale-data filtering.
+            Flow:
+                1. Cache Lookup: Attempt to retrieve data from Upstash Redis using
+                   the "Cache-Aside" pattern. Returns immediately on a hit.
+                2. Primary Fetch: On cache miss, query WeatherAPI by city name.
+                3. Backup Fetch: Use coordinates from the primary result to query OpenMeteo.
+                4. Aggregation: Normalize and average both responses into a
+                   CityWeatherData object, applying integrity and stale-data filters.
+                5. Cache Update: Write the successful aggregation back to Redis
+                   using the configured CACHE_TTL_SECONDS.
+                6. Resilience: Implements a "fail-open" strategy—if Redis is
+                   unavailable, the flow defaults to API retrieval to ensure availability.
 
-        Args:
-            city_name: The name of the city to query.
+            Args:
+                city_name: The name of the city to query (case-insensitive).
 
-        Returns:
-            A final, aggregated CityWeatherData object.
+            Returns:
+                A final, aggregated CityWeatherData object (either from cache or fresh).
 
-        Raises:
-            CityWeatherDataCityNotFoundError: If the city cannot be found.
-            CityWeatherDataRequestError: If the primary service request fails.
-            CityWeatherDataFetchError: If all retrieved data is considered stale.
-    """
+            Raises:
+                CityWeatherDataCityNotFoundError: If the city cannot be found.
+                CityWeatherDataRequestError: If the primary service request fails.
+                CityWeatherDataFetchError: If all retrieved data is considered stale.
+        """
+    normalized_city_name = city_name.strip().capitalize()
+    cache_key = f"weather:{normalized_city_name}"
+
+    # if os.getenv("TESTING") is None and not redis:
+    #     raise CityWeatherDataRequestError(WeatherServiceError(redis_init_error))
+
+    # Attempt cache read
+    if os.getenv("TESTING") is None and redis:
+        try:
+            cached_val = redis.get(cache_key)
+            if cached_val:
+                print(f"Redis cache hit for {normalized_city_name}")
+                data = json.loads(cached_val)
+                return CityWeatherData(**data)
+            else:
+                print(f"Redis cache miss for {normalized_city_name}. Fetching fresh data.")
+        except Exception as e:
+            print(f"Redis GET error for {normalized_city_name}: {e}. Fetching fresh data.")
+            #raise CityWeatherDataRequestError(WeatherServiceError(e))
+
     try:
         weather_service_responses = [weather_api.fetch_data_weather_api(city_name)]
 
@@ -321,6 +359,15 @@ def fetch_city_weather_data(city_name: str) -> CityWeatherData:
 
         if avg_weather_data is None:
             raise CityWeatherDataFetchError("All city weather datas were filtered out")
+
+        # Attempt cache write
+        try:
+            if os.getenv("TESTING") is None and redis:
+                redis.set(cache_key, json.dumps(avg_weather_data.__dict__), ex=CACHE_TTL)
+                print(f"Successfully cached {cache_key} in Redis.")
+        except Exception as e:
+            print(f"Redis SET error for {cache_key}: {e}.")
+            raise CityWeatherDataRequestError(WeatherServiceError(e))
 
         return avg_weather_data
     except WeatherApiCityNotFoundError:
