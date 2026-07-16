@@ -118,6 +118,10 @@ jobs:
           aws lambda remove-permission \
             --function-name ${{ env.LAMBDA_NAME }} \
             --statement-id FunctionURLAllowPublicAccess >/dev/null 2>&1 || true
+          
+          aws lambda remove-permission \
+            --function-name ${{ env.LAMBDA_NAME }} \
+            --statement-id FunctionURLAllowInvokeAction >/dev/null 2>&1 || true
 
           # 3. Apply Permission Part 1: Open public HTTP routing access to the endpoint
           echo "Applying Part 1: FunctionURLAllowPublicAccess..."
