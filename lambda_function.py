@@ -229,4 +229,4 @@ def lambda_handler(event, context: "Context") -> dict:
         return handle_city_not_found(context, city, prev_last_access_timestamp_message, recent_cities)
     except CityWeatherDataRequestError as e:
         print(f'City Weather data fetching failed due to a request error: {e}')
-        return handle_service_unavailable_error(context, prev_last_access_timestamp_message, recent_cities)
+        return handle_service_unavailable_error(context, prev_last_access_timestamp_message)
