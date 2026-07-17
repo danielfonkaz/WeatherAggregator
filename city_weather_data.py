@@ -100,8 +100,8 @@ class CityWeatherData:
             f"weather_condition={self.weather_condition!r})"
         )
 
-    def to_json(self):
-        """Serializes the object state into a JSON-formatted string.
+    def to_api_json(self):
+        """Serializes the object state into a consumer-ready, formatted JSON string.
 
             Transforms internal attributes into a consumer-ready format, including
             ISO 8601 timestamps, rounded temperatures, and human-readable
