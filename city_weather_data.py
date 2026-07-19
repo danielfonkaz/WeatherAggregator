@@ -100,6 +100,22 @@ class CityWeatherData:
             f"weather_condition={self.weather_condition!r})"
         )
 
+    @classmethod
+    def from_cache_json(cls, json_str: str):
+        """Parses cached JSON and hydrates string names back into real WeatherCondition Enums.
+        Args:
+            json_str: JSON string encoding a CityWeatherData instance.
+
+            Returns:
+                CityWeatherData: An object decoded from the JSON string.
+        """
+        data = json.loads(json_str)
+
+        # Convert ["CLEAR"] -> [WeatherCondition.CLEAR]
+        data["weather_condition"] = [WeatherCondition[name] for name in data["weather_condition"]]
+
+        return cls(**data)
+
     def to_api_json(self):
         """Serializes the object state into a consumer-ready, formatted JSON string.
 
@@ -119,6 +135,19 @@ class CityWeatherData:
             if len(self.weather_condition) > 0
             else "N / A"
         })
+
+    def to_cache_json(self) -> str:
+        """Serializes the raw dataclass fields for Redis, converting Enums to string names.
+            Returns:
+                str: A JSON string containing the processed weather data.
+        """
+        # Copy __dict__ so we don't accidentally mutate the live object state
+        data = self.__dict__.copy()
+
+        # Convert [WeatherCondition.CLEAR] -> ["CLEAR"]
+        data["weather_condition"] = [wc.name for wc in self.weather_condition]
+
+        return json.dumps(data)
 
 
 class CityWeatherDataFetchError(Exception):
@@ -337,8 +366,7 @@ def fetch_city_weather_data(city_name: str) -> CityWeatherData:
             cached_val = redis.get(cache_key)
             if cached_val:
                 print(f"Redis cache hit for {normalized_city_name}")
-                data = json.loads(cached_val)
-                return CityWeatherData(**data)
+                return CityWeatherData.from_cache_json(cached_val)
             else:
                 print(f"Redis cache miss for {normalized_city_name}. Fetching fresh data.")
         except Exception as e:
@@ -365,7 +393,7 @@ def fetch_city_weather_data(city_name: str) -> CityWeatherData:
         # Attempt cache write
         try:
             if os.getenv("TESTING") is None and redis:
-                redis.set(cache_key, json.dumps(avg_weather_data.__dict__), ex=CACHE_TTL)
+                redis.set(cache_key, avg_weather_data.to_cache_json(), ex=CACHE_TTL)
                 print(f"Successfully cached {cache_key} in Redis.")
         except Exception as e:
             print(f"Redis SET error for {cache_key}: {e}.")
