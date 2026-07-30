@@ -23,6 +23,8 @@ jobs:
           flake8 . --exclude=venv,.venv,env,bin,lib,deps --count --statistics  --ignore=E501,E127,E128,W503,E126
       - name: Run Unit Tests
         # keep pytest out of production, only used for testing
+        env:
+          TESTING: "true"
         run: | 
           pip install pytest
           pip install -r requirements.txt
@@ -88,34 +90,58 @@ jobs:
         run: |
           aws lambda update-function-configuration \
             --function-name ${{ env.LAMBDA_NAME }} \
-            --environment "Variables={WEATHER_API_KEY=${{ secrets.WEATHER_API_KEY }}}"
+            --environment "Variables={ \
+              WEATHER_API_KEY=${{ secrets.WEATHER_API_KEY }}, \
+              UPSTASH_REDIS_REST_URL=${{ secrets.UPSTASH_REDIS_REST_URL }}, \
+              UPSTASH_REDIS_REST_TOKEN=${{ secrets.UPSTASH_REDIS_REST_TOKEN }}, \
+              CACHE_TTL_SECONDS='1800' \
+            }"
 
       - name: Create or Update Lambda Function URL
         id: lambda-url
         run: |
-          # Create the Function URL if it doesn't exist
-          aws lambda create-function-url-config \
-            --function-name ${{ env.LAMBDA_NAME }} \
-            --auth-type NONE || aws lambda update-function-url-config \
-            --function-name ${{ env.LAMBDA_NAME }} \
-            --auth-type NONE
+          # 1. Handle Function URL Config
+          if ! aws lambda get-function-url-config --function-name ${{ env.LAMBDA_NAME }} >/dev/null 2>&1; then
+            echo "Function URL config missing. Creating..."
+            aws lambda create-function-url-config \
+              --function-name ${{ env.LAMBDA_NAME }} \
+              --auth-type NONE
+          else
+            echo "Function URL config exists. Ensuring AuthType is set to NONE..."
+            aws lambda update-function-url-config \
+              --function-name ${{ env.LAMBDA_NAME }} \
+              --auth-type NONE
+          fi
 
-          # Add permissions so anyone can invoke the URL
+          # 2. Clear out any old/corrupted permissions to avoid statement conflicts
+          echo "Clearing old permission statement if it exists..."
+          aws lambda remove-permission \
+            --function-name ${{ env.LAMBDA_NAME }} \
+            --statement-id FunctionURLAllowPublicAccess >/dev/null 2>&1 || true
+          
+          aws lambda remove-permission \
+            --function-name ${{ env.LAMBDA_NAME }} \
+            --statement-id FunctionURLAllowInvokeAction >/dev/null 2>&1 || true
+
+          # 3. Apply Permission Part 1: Open public HTTP routing access to the endpoint
+          echo "Applying Part 1: FunctionURLAllowPublicAccess..."
           aws lambda add-permission \
             --function-name ${{ env.LAMBDA_NAME }} \
             --statement-id FunctionURLAllowPublicAccess \
             --action lambda:InvokeFunctionUrl \
             --principal "*" \
-            --function-url-auth-type NONE || echo "InvokeFunctionUrl permission already exists"
-        
+            --function-url-auth-type NONE
+          
+          # 4. Apply Permission Part 2: Allow the URL mechanism to invoke the underlying engine
+          echo "Applying Part 2: FunctionURLAllowInvokeAction..."
           aws lambda add-permission \
             --function-name ${{ env.LAMBDA_NAME }} \
-            --statement-id AllowPublicInvokeBypass \
+            --statement-id FunctionURLAllowInvokeAction \
             --action lambda:InvokeFunction \
             --principal "*" \
-            --function-url-auth-type NONE || echo "InvokeFunction permission already exists"
+            --invoked-via-function-url          
 
-          # Get the URL to display in the logs
+          # 5. Capture the clean URL configuration for logging and step summary output
           URL=$(aws lambda get-function-url-config --function-name ${{ env.LAMBDA_NAME }} --query 'FunctionUrl' --output text)
           echo "LAMBDA_URL=$URL" >> $GITHUB_ENV
           echo "The Function URL is: $URL"

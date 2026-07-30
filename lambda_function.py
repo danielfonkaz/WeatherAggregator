@@ -221,7 +221,7 @@ def lambda_handler(event, context: "Context") -> dict:
     try:
         weather_data = city_weather_data.fetch_city_weather_data(city)
 
-        return get_response(200, context, city=city, weather=weather_data.to_json(),
+        return get_response(200, context, city=city, weather=weather_data.to_api_json(),
                             last_access=prev_last_access_timestamp_message,
                             recent_cities=get_unique_recent_cities_list(recent_cities))
     except CityWeatherDataCityNotFoundError as e:
@@ -229,4 +229,4 @@ def lambda_handler(event, context: "Context") -> dict:
         return handle_city_not_found(context, city, prev_last_access_timestamp_message, recent_cities)
     except CityWeatherDataRequestError as e:
         print(f'City Weather data fetching failed due to a request error: {e}')
-        return handle_service_unavailable_error(context, prev_last_access_timestamp_message, recent_cities)
+        return handle_service_unavailable_error(context, prev_last_access_timestamp_message)
