@@ -1,6 +1,6 @@
 # Weather Aggregator
 
-A serverless AWS Lambda function that aggregates real-time weather data from multiple REST APIs (currently only open-meteo.com and weatherapi.com are supported), returns a normalized JSON response, and stores ip-based user history in DynamoDB.
+A serverless AWS Lambda function that aggregates real-time weather data from multiple REST APIs (currently open-meteo.com and weatherapi.com), caches responses with Upstash Redis, returns a normalized JSON response, and stores IP-based user history in DynamoDB.
 
 ## Usage
 
